@@ -1,0 +1,127 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>GlitchVyr Tetris</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:#080817;color:#fff;font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;padding:16px}
+.game{width:100%;max-width:420px;text-align:center}
+h1{margin:0;color:#65f7ff;text-shadow:0 0 15px #00d9ff;font-size:30px}
+.sub{color:#a5a5d8;margin:8px 0 18px}
+.stats{display:flex;justify-content:space-around;background:#15152c;border:1px solid #38386a;border-radius:12px;padding:12px;margin-bottom:12px}
+.stats span{display:block;color:#aaaadd;font-size:12px;margin-bottom:5px}
+.stats strong{font-size:20px;color:#70faff}
+canvas{display:block;width:min(100%,300px);height:auto;margin:auto;background:#09091a;border:2px solid #6557ff;border-radius:8px;box-shadow:0 0 22px #5141aa55}
+button{background:#242044;color:white;border:1px solid #7164ff;border-radius:10px;padding:13px;font-size:16px;font-weight:bold;cursor:pointer;touch-action:manipulation}
+button:active{background:#5141aa}
+.controls{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+.controls button{font-size:22px;padding:13px 0}
+#start{width:100%;margin-top:12px;background:#4d36c9}
+.help{color:#aaaadd;font-size:12px;line-height:1.6;margin-top:12px}
+</style>
+</head>
+<body>
+<div class="game">
+<h1>GLITCHVYR</h1>
+<div class="sub">NEON TETRIS</div>
+<div class="stats">
+<div><span>ОЧКИ</span><strong id="score">0</strong></div>
+<div><span>ЛИНИИ</span><strong id="lines">0</strong></div>
+<div><span>УРОВЕНЬ</span><strong id="level">1</strong></div>
+</div>
+<canvas id="board" width="240" height="400"></canvas>
+<div class="controls">
+<button id="left" aria-label="Влево">◀</button>
+<button id="rotate" aria-label="Повернуть">↻</button>
+<button id="down" aria-label="Вниз">▼</button>
+<button id="right" aria-label="Вправо">▶</button>
+</div>
+<button id="start">▶ НАЧАТЬ / ЗАНОВО</button>
+<div class="help">Клавиатура: ← → движение · ↑ поворот · ↓ ускорить</div>
+</div>
+<script>
+const canvas=document.getElementById('board');
+const ctx=canvas.getContext('2d');
+const COLS=12,ROWS=20,S=20;
+const colors=['','#00e5ff','#a855f7','#ff3cac','#ffe45e','#53ff8b','#ff8a3d','#5271ff'];
+const shapes=[
+[[1,1,1,1]],
+[[2,0,0],[2,2,2]],
+[[0,0,3],[3,3,3]],
+[[4,4],[4,4]],
+[[0,5,5],[5,5,0]],
+[[0,6,0],[6,6,6]],
+[[7,7,0],[0,7,7]]
+];
+let grid,piece,score,lines,level,alive=false,timer=null,lastDrop=0;
+function emptyGrid(){return Array.from({length:ROWS},()=>Array(COLS).fill(0))}
+function spawn(){
+const shape=shapes[Math.floor(Math.random()*shapes.length)].map(r=>r.slice());
+piece={shape,x:Math.floor(COLS/2)-Math.ceil(shape[0].length/2),y:0};
+if(collide(0,0)){alive=false;clearInterval(timer);draw();ctx.fillStyle='#fff';ctx.font='bold 20px Arial';ctx.textAlign='center';ctx.fillText('ИГРА ОКОНЧЕНА',120,195);ctx.font='14px Arial';ctx.fillText('Нажми «Заново»',120,220)}
+}
+function collide(dx,dy,shape=piece.shape){
+for(let y=0;y<shape.length;y++)for(let x=0;x<shape[y].length;x++)if(shape[y][x]){
+let nx=piece.x+x+dx,ny=piece.y+y+dy;
+if(nx<0||nx>=COLS||ny>=ROWS||(ny>=0&&grid[ny][nx]))return true;
+}
+return false;
+}
+function drawCell(x,y,c){
+ctx.fillStyle=colors[c];ctx.fillRect(x*S+1,y*S+1,S-2,S-2);
+ctx.strokeStyle='#ffffff66';ctx.strokeRect(x*S+2,y*S+2,S-4,S-4);
+ctx.fillStyle='#ffffff22';ctx.fillRect(x*S+4,y*S+4,S-8,3);
+}
+function draw(){
+ctx.clearRect(0,0,canvas.width,canvas.height);
+ctx.strokeStyle='#242440';
+for(let x=0;x<=COLS;x++){ctx.beginPath();ctx.moveTo(x*S,0);ctx.lineTo(x*S,400);ctx.stroke()}
+for(let y=0;y<=ROWS;y++){ctx.beginPath();ctx.moveTo(0,y*S);ctx.lineTo(240,y*S);ctx.stroke()}
+for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)if(grid[y][x])drawCell(x,y,grid[y][x]);
+if(piece)for(let y=0;y<piece.shape.length;y++)for(let x=0;x<piece.shape[y].length;x++)if(piece.shape[y][x])drawCell(piece.x+x,piece.y+y,piece.shape[y][x]);
+}
+function updateStats(){
+document.getElementById('score').textContent=score;
+document.getElementById('lines').textContent=lines;
+document.getElementById('level').textContent=level;
+}
+function lock(){
+piece.shape.forEach((r,y)=>r.forEach((v,x)=>{if(v&&piece.y+y>=0)grid[piece.y+y][piece.x+x]=v}));
+let cleared=0;
+for(let y=ROWS-1;y>=0;y--)if(grid[y].every(v=>v)){grid.splice(y,1);grid.unshift(Array(COLS).fill(0));cleared++;y++}
+if(cleared){lines+=cleared;score+=[0,100,300,500,800][cleared]*level;level=Math.floor(lines/10)+1;updateStats()}
+spawn();
+}
+function tick(){if(!alive)return;if(!collide(0,1))piece.y++;else lock();draw()}
+function start(){
+clearInterval(timer);grid=emptyGrid();score=0;lines=0;level=1;alive=true;updateStats();spawn();draw();
+timer=setInterval(tick,700);
+}
+function move(dx,dy){if(!alive)return;if(!collide(dx,dy)){piece.x+=dx;piece.y+=dy;draw()}else if(dy===1){lock();draw()}}
+function rotate(){
+if(!alive)return;
+const sh=piece.shape,rot=sh[0].map((_,i)=>sh.map(r=>r[i]).reverse());
+if(!collide(0,0,rot))piece.shape=rot;
+else if(!collide(-1,0,rot)){piece.x--;piece.shape=rot}
+draw();
+}
+document.getElementById('start').addEventListener('click',start);
+document.getElementById('left').addEventListener('click',()=>move(-1,0));
+document.getElementById('right').addEventListener('click',()=>move(1,0));
+document.getElementById('down').addEventListener('click',()=>{if(alive){move(0,1);score++;updateStats()}});
+document.getElementById('rotate').addEventListener('click',rotate);
+document.addEventListener('keydown',e=>{
+if(['ArrowLeft','ArrowRight','ArrowDown','ArrowUp',' '].includes(e.key))e.preventDefault();
+if(e.key==='ArrowLeft')move(-1,0);
+if(e.key==='ArrowRight')move(1,0);
+if(e.key==='ArrowDown'&&alive){move(0,1);score++;updateStats()}
+if(e.key==='ArrowUp')rotate();
+if(e.key===' '&&!alive)start();
+});
+start();
+</script>
+</body>
+</html>
